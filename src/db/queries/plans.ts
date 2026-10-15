@@ -20,6 +20,11 @@ export async function getPlanById(id: string) {
     return result;
 }
 
+export async function getPlanByName(name: string) {
+    const [result] = await db.select().from(plans).where(eq(plans.name, name));
+    return result;
+}
+
 export async function deactivatePlanById(id: string) {
     const [result] = await db.update(plans).set({ is_active: false }).where(eq(plans.id, id)).returning();
     return result;

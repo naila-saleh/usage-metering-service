@@ -30,6 +30,10 @@ export const subplans = pgTable("subplans", {
     max_request_limit: integer("max_request_limit").notNull(),
     is_system_plan: boolean("is_system_plan").notNull().default(false),
     created_by_account_id: uuid("created_by_account_id"),
+}, (table) => {
+    return {
+        unique_plan_subplan_constraint: unique("unique_plan_subplan_constraint").on(table.plan_id, table.name),
+    };
 });
 
 export type NewSubplan = typeof subplans.$inferInsert;

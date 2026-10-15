@@ -1,6 +1,6 @@
 import { db } from "../index.js";
 import { NewSubplan, subplans } from "../schema.js";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function createSubplan(subplan: NewSubplan) {
     const [result] = await db
@@ -22,6 +22,11 @@ export async function getSubplanById(id: string) {
 
 export async function getSubplansByPlanId(planId: string) {
     const result = await db.select().from(subplans).where(eq(subplans.plan_id, planId)).orderBy(subplans.created_at);
+    return result;
+}
+
+export async function getSubplanByName(planId: string, name: string) {
+    const [result] = await db.select().from(subplans).where(and(eq(subplans.plan_id, planId), eq(subplans.name, name)));
     return result;
 }
 

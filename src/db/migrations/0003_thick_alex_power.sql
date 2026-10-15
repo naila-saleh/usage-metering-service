@@ -1,0 +1,1 @@
+ALTER TABLE "subplans" ADD CONSTRAINT "unique_plan_subplan_constraint" UNIQUE("plan_id","name");
