@@ -1,4 +1,4 @@
-import {pgTable, timestamp, varchar, uuid, boolean, integer, unique} from "drizzle-orm/pg-core";
+import {pgTable, timestamp, varchar, uuid, boolean, integer, unique, decimal} from "drizzle-orm/pg-core";
 
 export const plans = pgTable("plans", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -24,7 +24,7 @@ export const subplans = pgTable("subplans", {
     plan_id: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 256 }).notNull(),
     description: varchar("description", { length: 1024 }).notNull(),
-    price: varchar("price", { length: 256 }).notNull(),
+    price: decimal("price", { precision: 10, scale: 2 }).notNull(),
     is_active: boolean("is_active").notNull().default(true),
     monthly_limit: integer("monthly_limit").notNull(),
     max_request_limit: integer("max_request_limit").notNull(),

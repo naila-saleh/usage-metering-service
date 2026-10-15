@@ -15,6 +15,13 @@
       "when": 1792068303273,
       "tag": "0001_fair_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792072431811,
+      "tag": "0002_overjoyed_starbolt",
+      "breakpoints": true
     }
   ]
 }
