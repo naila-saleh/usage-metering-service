@@ -8,6 +8,13 @@
       "when": 1791967911600,
       "tag": "0000_demonic_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792068303273,
+      "tag": "0001_fair_kylun",
+      "breakpoints": true
     }
   ]
 }

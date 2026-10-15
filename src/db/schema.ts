@@ -12,6 +12,8 @@ export const plans = pgTable("plans", {
     is_active: boolean("is_active").notNull().default(true),
 });
 
+export type NewPlan = typeof plans.$inferInsert;
+
 export const subplans = pgTable("subplans", {
     id: uuid("id").primaryKey().defaultRandom(),
     created_at: timestamp("created_at").notNull().defaultNow(),
@@ -30,6 +32,8 @@ export const subplans = pgTable("subplans", {
     created_by_account_id: uuid("created_by_account_id"),
 });
 
+export type NewSubplan = typeof subplans.$inferInsert;
+
 export const accounts = pgTable("accounts", {
     id: uuid("id").primaryKey().defaultRandom(),
     created_at: timestamp("created_at").notNull().defaultNow(),
@@ -43,6 +47,8 @@ export const accounts = pgTable("accounts", {
     subplan_id: uuid("subplan_id").notNull().references(() => subplans.id, { onDelete: "cascade" }),
 });
 
+export type NewAccount = typeof accounts.$inferInsert;
+
 export const users = pgTable("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     created_at: timestamp("created_at").notNull().defaultNow(),
@@ -52,10 +58,13 @@ export const users = pgTable("users", {
         .$onUpdate(() => new Date()),
     email: varchar("email", { length: 256 }).unique().notNull(),
     hashed_password: varchar("hashed_password", { length: 256 }).notNull().$defaultFn(() => "unset"),
+    is_active: boolean("is_active").notNull().default(true),
     is_admin: boolean("is_admin").notNull().default(false),
     account_id: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
     subplan_id: uuid("subplan_id").notNull().references(() => subplans.id, { onDelete: "cascade" }),
 });
+
+export type NewUser = typeof users.$inferInsert;
 
 export const usages = pgTable("usages", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -76,3 +85,5 @@ export const usages = pgTable("usages", {
         unique_request_constraint: unique("unique_request_constraint").on(table.request_id, table.account_id),
     };
 });
+
+export type NewUsage = typeof usages.$inferInsert;
