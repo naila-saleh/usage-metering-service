@@ -6,3 +6,7 @@ import { config } from "../config.js";
 
 const conn = postgres(config.db.url);
 export const db = drizzle(conn, { schema });
+
+export const closeDb = async () => {
+    await conn.end();
+};
