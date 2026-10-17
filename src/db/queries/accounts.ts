@@ -1,5 +1,6 @@
 import { db } from "../index.js";
-import { NewAccount, accounts } from "../schema.js";
+import type { Transaction } from "../index.js";
+import { NewAccount, accounts, subplans } from "../schema.js";
 import { eq } from "drizzle-orm";
 
 export async function createAccount(account: NewAccount) {
@@ -32,5 +33,19 @@ export async function deactivateAccountById(id: string) {
 
 export async function activateAccountById(id: string) {
     const [result] = await db.update(accounts).set({ is_active: true }).where(eq(accounts.id, id)).returning();
+    return result;
+}
+
+export async function getAccountAndSubplanByAccountId(accountId: string, transaction?: Transaction) {
+    if (transaction) {
+        const [result] = await transaction.select().from(accounts).innerJoin(subplans, eq(accounts.subplan_id, subplans.id)).where(eq(accounts.id, accountId)).for('update', { of: accounts });
+        return result;
+    }
+    const [result] = await db.select().from(accounts).innerJoin(subplans, eq(accounts.subplan_id, subplans.id)).where(eq(accounts.id, accountId));
+    return result;
+}
+
+export async function deleteAccountById(id: string) {
+    const [result] = await db.delete(accounts).where(eq(accounts.id, id)).returning();
     return result;
 }

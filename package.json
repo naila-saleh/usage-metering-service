@@ -9,18 +9,22 @@
     "dev": "npx tsc && node dist/index.js",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "test": "vitest --run",
+    "test": "NODE_ENV=test dotenv -e .env.test -o -- vitest --run",
+    "migrate:test": "NODE_ENV=test dotenv -e .env.test -o -- drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "seed:test": "NODE_ENV=test dotenv -e .env.test -o -- tsx src/db/seed.ts"
   },
   "keywords": [],
   "type": "commonjs",
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",

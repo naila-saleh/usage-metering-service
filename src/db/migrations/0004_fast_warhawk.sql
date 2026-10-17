@@ -1,0 +1,2 @@
+ALTER TABLE "accounts" ADD COLUMN "subscription_started_at" timestamp DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "subscription_started_at" timestamp DEFAULT now() NOT NULL;

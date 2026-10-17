@@ -29,6 +29,13 @@
       "when": 1792074195096,
       "tag": "0003_thick_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792163991360,
+      "tag": "0004_fast_warhawk",
+      "breakpoints": true
     }
   ]
 }

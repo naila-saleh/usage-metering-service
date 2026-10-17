@@ -49,6 +49,7 @@ export const accounts = pgTable("accounts", {
     is_active: boolean("is_active").notNull().default(true),
     hashed_api_key: varchar("hashed_api_key", { length: 256 }).notNull(),
     subplan_id: uuid("subplan_id").notNull().references(() => subplans.id, { onDelete: "cascade" }),
+    subscription_started_at: timestamp("subscription_started_at").notNull().defaultNow(),
 });
 
 export type NewAccount = typeof accounts.$inferInsert;
@@ -66,6 +67,7 @@ export const users = pgTable("users", {
     is_admin: boolean("is_admin").notNull().default(false),
     account_id: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
     subplan_id: uuid("subplan_id").notNull().references(() => subplans.id, { onDelete: "cascade" }),
+    subscription_started_at: timestamp("subscription_started_at").notNull().defaultNow(),
 });
 
 export type NewUser = typeof users.$inferInsert;
