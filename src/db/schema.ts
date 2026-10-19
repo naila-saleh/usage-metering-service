@@ -62,7 +62,6 @@ export const users = pgTable("users", {
         .defaultNow()
         .$onUpdate(() => new Date()),
     email: varchar("email", { length: 256 }).unique().notNull(),
-    hashed_password: varchar("hashed_password", { length: 256 }).notNull().$defaultFn(() => "unset"),
     is_active: boolean("is_active").notNull().default(true),
     is_admin: boolean("is_admin").notNull().default(false),
     account_id: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),

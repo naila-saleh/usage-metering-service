@@ -28,7 +28,6 @@ describe('consumeUsage Integration Tests', () => {
         });
         user = await createUser({
             email: `test-${uniqueId}@example.com`,
-            hashed_password: 'hashed_password',
             is_active: true,
             is_admin: false,
             account_id: account!.id,

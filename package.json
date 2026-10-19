@@ -9,7 +9,7 @@
     "dev": "npx tsc && node dist/index.js",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "test": "NODE_ENV=test dotenv -e .env.test -o -- vitest --run",
+    "test": "NODE_ENV=test dotenv -e .env.test -o -- vitest --run --exclude '**/dist/**'",
     "migrate:test": "NODE_ENV=test dotenv -e .env.test -o -- drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
     "seed": "tsx src/db/seed.ts",

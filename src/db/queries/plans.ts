@@ -10,6 +10,15 @@ export async function createPlan(plan: NewPlan) {
     return result;
 }
 
+export async function updatePlan(id: string, plan: Partial<NewPlan>) {
+    const [result] = await db
+        .update(plans)
+        .set(plan)
+        .where(eq(plans.id, id))
+        .returning();
+    return result;
+}
+
 export async function getAllPlans() {
     const result = await db.select().from(plans).orderBy(plans.created_at);
     return result;

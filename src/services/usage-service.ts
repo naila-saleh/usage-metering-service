@@ -3,30 +3,13 @@ import { getAccountAndSubplanByAccountId } from "../db/queries/accounts";
 import { getUserAndSubplanByUserId } from "../db/queries/users";
 import { db } from "../db";
 
-function getSubscriptionDate(subscriptionStartedAt: Date, monthsToAdd: number, startsAtMonthEnd: boolean): Date {
-    const targetDate = new Date(subscriptionStartedAt);
-    targetDate.setDate(1);
-    targetDate.setMonth(targetDate.getMonth() + monthsToAdd);
-    const lastDay = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate();
-    const day = startsAtMonthEnd ? lastDay : Math.min(subscriptionStartedAt.getDate(), lastDay);
-    targetDate.setDate(day);
-    return targetDate;
-}
-
-function getCurrentSubscriptionCycle(subscriptionStartedAt: Date, now: Date = new Date()) {
+export function getCurrentSubscriptionCycle(subscriptionStartedAt: Date, now: Date = new Date()) {
     if (now < subscriptionStartedAt) {
         throw new Error("Subscription has not started yet");
     }
-    const lastDayOfStartMonth = new Date(subscriptionStartedAt.getFullYear(), subscriptionStartedAt.getMonth() + 1, 0).getDate();
-    const startsAtMonthEnd = subscriptionStartedAt.getDate() === lastDayOfStartMonth;
-    let monthsElapsed = (now.getFullYear() - subscriptionStartedAt.getFullYear()) * 12 + now.getMonth() - subscriptionStartedAt.getMonth();
-    let startDate = getSubscriptionDate(subscriptionStartedAt, monthsElapsed, startsAtMonthEnd);
-    if (now < startDate) {
-        monthsElapsed--;
-        startDate = getSubscriptionDate(subscriptionStartedAt, monthsElapsed, startsAtMonthEnd);
-    }
-    const endDate = getSubscriptionDate(subscriptionStartedAt, monthsElapsed + 1, startsAtMonthEnd);
-    return { start: startDate, end: endDate };
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    return { start, end };
 }
 
 export async function consumeUsage(accountId: string, userId: string, requestId: string, units: number) {
@@ -102,4 +85,32 @@ export async function consumeUsage(accountId: string, userId: string, requestId:
         return result;
     }
     return isUsageExists;
+}
+
+export async function getUsageSummary(accountId: string, userId: string) {
+    const account = await getAccountAndSubplanByAccountId(accountId);
+    if (!account) {
+        throw new Error(`Account with ID ${accountId} not found`);
+    }
+    const user = await getUserAndSubplanByUserId(userId, accountId);
+    if (!user) {
+        throw new Error(`User with ID ${userId} not found`);
+    }
+    const now = new Date();
+    const accountCycle = getCurrentSubscriptionCycle(account.accounts.subscription_started_at, now);
+    const userCycle = getCurrentSubscriptionCycle(user.users.subscription_started_at, now);
+    const monthlyAccountUsage = await getMonthlyAccountUsage(accountId, accountCycle.start, accountCycle.end);
+    const monthlyUserUsage = await getMonthlyUserUsage(userId, accountId, userCycle.start, userCycle.end);
+    return {
+        account: {
+            monthlyLimit: account.subplans.monthly_limit,
+            used: monthlyAccountUsage,
+            remaining: Math.max(account.subplans.monthly_limit - monthlyAccountUsage, 0),
+        },
+        user: {
+            monthlyLimit: user.subplans.monthly_limit,
+            used: monthlyUserUsage,
+            remaining: Math.max(user.subplans.monthly_limit - monthlyUserUsage, 0),
+        },
+    };
 }

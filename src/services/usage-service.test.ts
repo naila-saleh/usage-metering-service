@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { consumeUsage } from "./usage-service";
 import { db } from "../db";
 import { getUsageByRequestId, createUsage, setUsageSuccess, getMonthlyAccountUsage, getMonthlyUserUsage,} from "../db/queries/usages";
@@ -133,5 +133,34 @@ describe("consumeUsage", () => {
         ).rejects.toThrow("exceeds the maximum request limit for account");
 
         expect(createUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses UTC calendar month boundaries for quota checks", async () => {
+        vi.mocked(getUsageByRequestId)
+            .mockResolvedValueOnce(undefined)
+            .mockResolvedValueOnce(undefined);
+
+        vi.useFakeTimers({ now: new Date("2026-10-31T23:30:00.000Z") });
+
+        await consumeUsage("account-1", "user-1", "request-2", 1);
+
+        expect(getMonthlyAccountUsage).toHaveBeenCalledWith(
+            "account-1",
+            new Date("2026-10-01T00:00:00.000Z"),
+            new Date("2026-11-01T00:00:00.000Z"),
+            expect.anything(),
+        );
+
+        expect(getMonthlyUserUsage).toHaveBeenCalledWith(
+            "user-1",
+            "account-1",
+            new Date("2026-10-01T00:00:00.000Z"),
+            new Date("2026-11-01T00:00:00.000Z"),
+            expect.anything(),
+        );
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 });

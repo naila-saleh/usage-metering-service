@@ -49,3 +49,8 @@ export async function deleteAccountById(id: string) {
     const [result] = await db.delete(accounts).where(eq(accounts.id, id)).returning();
     return result;
 }
+
+export async function updateAccountSubplan(accountId: string, newSubplanId: string) {
+    const [result] = await db.update(accounts).set({ subplan_id: newSubplanId }).where(eq(accounts.id, accountId)).returning();
+    return result;
+}

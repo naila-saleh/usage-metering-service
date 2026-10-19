@@ -44,3 +44,8 @@ export async function deleteUserById(id: string, accountId: string) {
     const [result] = await db.delete(users).where(and(eq(users.account_id, accountId), eq(users.id, id))).returning();
     return result;
 }
+
+export async function updateUserSubplan(userId: string, accountId: string, newSubplanId: string) {
+    const [result] = await db.update(users).set({ subplan_id: newSubplanId }).where(and(eq(users.account_id, accountId), eq(users.id, userId))).returning();
+    return result;
+}
