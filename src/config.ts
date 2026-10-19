@@ -1,7 +1,10 @@
+import { existsSync } from "node:fs";
 
-process.loadEnvFile(
-    process.env.NODE_ENV === "test" ? ".env.test" : ".env"
-);
+const envFile = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
+
+if (existsSync(envFile)) {
+    process.loadEnvFile(envFile);
+}
 
 type APIConfig = {
     port: number;
