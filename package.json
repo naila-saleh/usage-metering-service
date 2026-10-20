@@ -13,7 +13,8 @@
     "migrate:test": "NODE_ENV=test dotenv -e .env.test -o -- drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
     "seed": "tsx src/db/seed.ts",
-    "seed:test": "NODE_ENV=test dotenv -e .env.test -o -- tsx src/db/seed.ts"
+    "seed:test": "NODE_ENV=test dotenv -e .env.test -o -- tsx src/db/seed.ts",
+    "demo": "PLATFORM=dev tsx client/demo.ts"
   },
   "keywords": [],
   "type": "commonjs",

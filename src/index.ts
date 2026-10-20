@@ -7,8 +7,13 @@ import { getAccountByHashedApiKey, createAccount, updateAccountSubplan } from '.
 import {getPlanById, getPlanByName} from "./db/queries/plans";
 import {getSubplanByName, updateSubplan, getSubplansByPlanId, createSubplan, getSubplanById} from "./db/queries/subplans";
 import { createUser, getUserAndSubplanByUserId, updateUserSubplan } from "./db/queries/users";
-import { getUsageByRequestId, getAccountUsageHistory, getUserUsageHistory } from "./db/queries/usages";
-import { consumeUsage, getUsageSummary } from "./services/usage-service";
+import {
+    getUsageByRequestId,
+    getAccountUsageHistory,
+    getUserUsageHistory,
+    getMonthlyAccountUsage
+} from "./db/queries/usages";
+import {consumeUsage, getCurrentSubscriptionCycle, getUsageSummary} from "./services/usage-service";
 
 
 const app = express();
@@ -58,12 +63,12 @@ app.post("/accounts", async (req, res) => {
     if (!newAccount) {
         return res.status(500).json({ error: "Failed to create account" });
     }
-    res.status(201).json({ accountId: newAccount.id, accountName: newAccount.name, planName: subplan.name, apiKey });
+    return res.status(201).json({ accountId: newAccount.id, accountName: newAccount.name, planName: subplan.name, apiKey });
 });
 
 app.get('/accounts/me', middlewareAuthenticateApiKey, async (req, res) => {
     const account = res.locals.account;
-    res.status(200).json({ accountId: account.id, accountName: account.name, isActive: account.is_active });
+    return res.status(200).json({ accountId: account.id, accountName: account.name, isActive: account.is_active });
 });
 
 app.post("/users", middlewareAuthenticateApiKey, async (req, res) => {
@@ -84,7 +89,7 @@ app.post("/users", middlewareAuthenticateApiKey, async (req, res) => {
     if (!newUser) {
         return res.status(500).json({ error: "Failed to create user" });
     }
-    res.status(201).json({ userId: newUser.id, email: newUser.email, planName: subplan.name });
+    return res.status(201).json({ userId: newUser.id, email: newUser.email, planName: subplan.name });
 });
 
 app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
@@ -100,9 +105,9 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
         const result = await consumeUsage(account.id, userId, requestId, units);
         if (result){
             if (result.is_success) {
-                res.status(200).json({ success: true, unitsConsumed: result.amount });
+                return res.status(200).json({ success: true, unitsConsumed: result.amount });
             } else {
-                res.status(403).json({ success: false, error: result.rejected_reason });
+                return res.status(403).json({ success: false, error: result.rejected_reason });
             }
         }
     } catch (error) {
@@ -115,7 +120,7 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
             }
         }
         console.error(error);
-        res.status(500).json({ error: "Internal server error" });
+        return res.status(500).json({ error: "Internal server error" });
     }
 });
 
@@ -144,10 +149,10 @@ app.get("/usage/history", middlewareAuthenticateApiKey, async (req, res) => {
             return res.status(403).json({ error: "User does not belong to this account" });
         }
         const userUsageHistory = await getUserUsageHistory(userId as string, account.id, limit, page);
-        res.status(200).json(userUsageHistory);
+        return res.status(200).json(userUsageHistory);
     } else {
         const accountUsageHistory = await getAccountUsageHistory(account.id, limit, page);
-        res.status(200).json(accountUsageHistory);
+        return res.status(200).json(accountUsageHistory);
     }
 });
 
@@ -188,11 +193,19 @@ app.patch("/accounts/me/plan", middlewareAuthenticateApiKey, async (req, res) =>
     if (account.subplan_id === subplan.id) {
         return res.status(400).json({ error: "Account is already on this plan" });
     }
+    const {start, end} = getCurrentSubscriptionCycle(account.subscription_started_at);
+    let monthlyUsage = await getMonthlyAccountUsage(account.id, start, end);
+    if (!subplan) {
+        return res.status(500).json({ error: "Failed to retrieve new subplan" });
+    }
+    if (monthlyUsage > subplan.monthly_limit) {
+        return res.status(409).json({ error: "Cannot downgrade plan due to current usage exceeding the new plan's monthly limit" });
+    }
     const updatedAccount = await updateAccountSubplan(account.id, subplan.id);
     if (!updatedAccount) {
         return res.status(500).json({ error: "Failed to update account plan" });
     }
-    res.status(200).json({ accountId: updatedAccount.id, accountName: updatedAccount.name, planName: subplan.name });
+    return res.status(200).json({ accountId: updatedAccount.id, accountName: updatedAccount.name, planName: subplan.name });
 });
 
 app.patch("/users/:userId/plan", middlewareAuthenticateApiKey, async (req, res) => {
@@ -227,7 +240,7 @@ app.patch("/users/:userId/plan", middlewareAuthenticateApiKey, async (req, res) 
     if (!updatedUser) {
         return res.status(500).json({ error: "Failed to update user plan" });
     }
-    res.status(200).json({ userId: updatedUser.id, email: updatedUser.email, planName: subplan.name });
+    return res.status(200).json({ userId: updatedUser.id, email: updatedUser.email, planName: subplan.name });
 });
 
 app.get("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, res) => {
@@ -314,19 +327,24 @@ app.get("/plans", middlewareAuthenticateApiKey, async (req, res) => {
     }
     const accountPlans = await getSubplansByPlanId(accountPlan.id, account.id);
     const userPlans = await getSubplansByPlanId(userPlan.id, account.id);
-    res.status(200).json({ accountPlans, userPlans });
+    return res.status(200).json({ accountPlans, userPlans });
 });
 
 app.get("/health", async (req, res) => {
     try {
         await db.select().from(plans).limit(1);
-        res.status(200).json({ status: "ok", database: "connected" });
+        return res.status(200).json({ status: "ok", database: "connected" });
     } catch (error) {
         console.error(error);
-        res.status(503).json({ status: "error", database: "disconnected" });
+        return res.status(503).json({ status: "error", database: "disconnected" });
     }
 });
 
-app.listen(port, '0.0.0.0', () => {
-    console.log("Usage Metering Service is running!");
-});
+// Start the server only if this file is run directly, not when imported
+if (require.main === module) {
+    app.listen(port, '0.0.0.0', () => {
+        console.log("Usage Metering Service is running!");
+    });
+}
+
+export default app;
