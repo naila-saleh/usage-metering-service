@@ -39,6 +39,25 @@ services:
       db:
         condition: service_healthy
     command: ["sh", "-c", "npm run migrate && npm run seed && npm start"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: usage-metering-demo
+    restart: no
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      PLATFORM: "production"
+    command: ["sh", "-c", "npm run demo:prod"]
 
 volumes:
   postgres_data:

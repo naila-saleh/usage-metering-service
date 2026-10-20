@@ -10,11 +10,13 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "test": "NODE_ENV=test dotenv -e .env.test -o -- vitest --run --exclude '**/dist/**'",
+    "test:performance": "NODE_ENV=test dotenv -e .env.test -o -- vitest --run --exclude '**/dist/**' src/services/performance.test.ts",
     "migrate:test": "NODE_ENV=test dotenv -e .env.test -o -- drizzle-kit migrate",
     "typecheck": "tsc --noEmit",
     "seed": "tsx src/db/seed.ts",
     "seed:test": "NODE_ENV=test dotenv -e .env.test -o -- tsx src/db/seed.ts",
-    "demo": "PLATFORM=dev tsx client/demo.ts"
+    "demo": "PLATFORM=dev tsx client/demo.ts",
+    "demo:prod": "PLATFORM=production tsx client/demo.ts"
   },
   "keywords": [],
   "type": "commonjs",
