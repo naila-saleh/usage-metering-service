@@ -6,13 +6,13 @@ import { createHash, randomBytes } from 'node:crypto'
 import { getAccountByHashedApiKey, createAccount, updateAccountSubplan } from './db/queries/accounts'
 import {getPlanById, getPlanByName} from "./db/queries/plans";
 import {getSubplanByName, updateSubplan, getSubplansByPlanId, createSubplan, getSubplanById} from "./db/queries/subplans";
-import { createUser, getUserAndSubplanByUserId, updateUserSubplan } from "./db/queries/users";
+import {createUser, getAllUsersByAccountId, getUserAndSubplanByUserId, updateUserSubplan} from "./db/queries/users";
 import {
     getUsageByRequestId,
     getAccountUsageHistory,
     getUserUsageHistory,
 } from "./db/queries/usages";
-import {consumeUsage, getUsageSummary} from "./services/usage-service";
+import {consumeUsage, getUsageSummary, getUsageSummaryForAccount} from "./services/usage-service";
 
 
 const app = express();
@@ -188,6 +188,26 @@ app.get("/usage/summary", middlewareAuthenticateApiKey, async (req, res) => {
     return res.status(400).json({ error: "userId is required" });
 });
 
+app.get("/usage/summary/account", middlewareAuthenticateApiKey, async (req, res) => {
+    const account = res.locals.account;
+    const summary = await getUsageSummaryForAccount(account.id);
+    return res.status(200).json(summary);
+});
+
+app.get('/usage/summary/accountusers', middlewareAuthenticateApiKey, async (req, res) => {
+    const account = res.locals.account;
+    const users = await getAllUsersByAccountId(account.id);
+    const summaries = await Promise.all(users.map(async (user) => {
+        const summary = await getUsageSummary(account.id, user.id);
+        return {
+            userId: user.id,
+            email: user.email,
+            ...summary
+        };
+    }));
+    return res.status(200).json(summaries);
+});
+
 app.patch("/accounts/me/plan", middlewareAuthenticateApiKey, async (req, res) => {
     const { planName } = req.body;
     if (!planName || typeof planName !== 'string' || planName.trim() === '') {
@@ -258,6 +278,56 @@ app.get("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, res
     }
     const subplans = await getSubplansByPlanId(planId, res.locals.account.id);
     return res.status(200).json(subplans);
+});
+
+app.get("/account/me/plan", middlewareAuthenticateApiKey, async (req, res) => {
+    const account = res.locals.account;
+    const plan = await getPlanByName("Account Plans");
+    if (plan === undefined) {
+        return res.status(404).json({ error: "Plan not found" });
+    }
+    const subplans = await getSubplansByPlanId(plan.id, account.id);
+    const currentSubplan = subplans.find(subplan => subplan.id === account.subplan_id);
+    if (currentSubplan === undefined) {
+        return res.status(404).json({ error: "Current subplan not found" });
+    }
+    return res.status(200).json({ planName: currentSubplan.name, description: currentSubplan.description, price: currentSubplan.price, monthly_limit: currentSubplan.monthly_limit, max_request_limit: currentSubplan.max_request_limit });
+});
+
+app.get("/account/me/userplans", middlewareAuthenticateApiKey, async (req, res) => {
+    const account = res.locals.account;
+    const plan = await getPlanByName("User Plans");
+    if (plan === undefined) {
+        return res.status(404).json({ error: "Plan not found" });
+    }
+    const subplans = await getSubplansByPlanId(plan.id, account.id);
+    const users = await getAllUsersByAccountId(account.id);
+    const userPlans = users.map(user => {
+        const userSubplan = subplans.find(subplan => subplan.id === user.subplan_id);
+        return {
+            userId: user.id,
+            email: user.email,
+            planName: userSubplan ? userSubplan.name : null,
+            description: userSubplan ? userSubplan.description : null,
+            price: userSubplan ? userSubplan.price : null,
+            monthly_limit: userSubplan ? userSubplan.monthly_limit : null,
+            max_request_limit: userSubplan ? userSubplan.max_request_limit : null
+        };
+    });
+    return res.status(200).json(userPlans);
+});
+
+app.get("/user/me/plan/:userId", middlewareAuthenticateApiKey, async (req, res) => {
+    const account = res.locals.account;
+    const userId = req.query.userId;
+    if (userId === undefined || typeof userId !== 'string' || userId.trim() === '') {
+        return res.status(400).json({ error: "Missing required field: userId" });
+    }
+    const user = await getUserAndSubplanByUserId(userId, account.id);
+    if ( user === undefined) {
+        return res.status(404).json({ error: "User not found" });
+    }
+    return res.status(200).json(user.subplans);
 });
 
 app.post("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, res) => {

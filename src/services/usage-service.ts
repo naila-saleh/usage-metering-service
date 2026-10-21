@@ -21,7 +21,7 @@ export async function consumeUsage(accountId: string, userId: string, requestId:
                 return new Error(`Account with ID ${accountId} not found`);
             }
             const existingUsage = await getUsageByRequestId(requestId, accountId, tx);
-            if (existingUsage) {
+            if (existingUsage && existingUsage.amount === units) {
                 return existingUsage.is_success? existingUsage :new Error(existingUsage.rejected_reason);
             }
             const user = await getUserAndSubplanByUserId(userId, accountId, tx);
@@ -111,6 +111,23 @@ export async function getUsageSummary(accountId: string, userId: string) {
             monthlyLimit: user.subplans.monthly_limit,
             used: monthlyUserUsage,
             remaining: Math.max(user.subplans.monthly_limit - monthlyUserUsage, 0),
+        },
+    };
+}
+
+export async function getUsageSummaryForAccount(accountId: string) {
+    const account = await getAccountAndSubplanByAccountId(accountId);
+    if (!account) {
+        throw new Error(`Account with ID ${accountId} not found`);
+    }
+    const now = new Date();
+    const accountCycle = getCurrentSubscriptionCycle(account.accounts.subscription_started_at, now);
+    const monthlyAccountUsage = await getMonthlyAccountUsage(accountId, accountCycle.start, accountCycle.end);
+    return {
+        account: {
+            monthlyLimit: account.subplans.monthly_limit,
+            used: monthlyAccountUsage,
+            remaining: Math.max(account.subplans.monthly_limit - monthlyAccountUsage, 0),
         },
     };
 }
