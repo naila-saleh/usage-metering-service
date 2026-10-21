@@ -107,7 +107,7 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
             if (result.is_success) {
                 return res.status(200).json({ success: true, unitsConsumed: result.amount });
             } else {
-                return res.status(403).json({ success: false, error: result.rejected_reason });
+                return res.status(403).json({ success: false, rejectedBy: result.rejected_by, error: result.rejected_reason });
             }
         }
     } catch (error) {
@@ -116,7 +116,7 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
             if (usage.is_success) {
                 return res.status(200).json({ success: true, unitsConsumed: usage.amount });
             } else {
-                return res.status(403).json({ success: false, error: usage.rejected_reason });
+                return res.status(403).json({ success: false, rejectedBy: usage.rejected_by, error: usage.rejected_reason });
             }
         }
         console.error(error);

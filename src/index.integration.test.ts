@@ -76,6 +76,25 @@ describe("Usage Metering Service", () => {
         }
     });
 
+    it('should reject requests with invalid API keys', async () => {
+        const response = await fetch(`${baseUrl}/accounts/me`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': 'invalid-api-key',
+            },
+        });
+        expect(response.status).toBe(401);
+    });
+
+    it('should reject requests with missing API keys', async () => {
+        const response = await fetch(`${baseUrl}/accounts/me`, {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        expect(response.status).toBe(401);
+    });
+
     it('should deny account 2 access to account 1 user\'s summary', async () => {
         if ( testUser1 === undefined) {
             throw new Error("Test user is not defined");

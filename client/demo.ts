@@ -71,7 +71,7 @@ export async function main() {
     }
     const userId = createUser.body.userId;
     console.log(`Created user ${createUser.body.email} with ID ${userId}`);
-    const createUsageConsume = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, error: string }>(`/usage/consume`, 'POST', apiKey, {
+    const createUsageConsume = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
         userId: userId,
         requestId: uniqueId,
         units: 2
@@ -93,7 +93,7 @@ export async function main() {
         throw new Error(`Failed to update account plan: ${JSON.stringify(patchAccountPlan.body)}`);
     }
     console.log(`Updated account plan to Pro for account ${createAccount.body.accountId}`);
-    const createUsageConsumeAfterPlanChange = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, error: string }>(`/usage/consume`, 'POST', apiKey, {
+    const createUsageConsumeAfterPlanChange = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
         userId: userId,
         requestId: randomUUID(),
         units: 11
@@ -104,7 +104,10 @@ export async function main() {
     if (!('error' in createUsageConsumeAfterPlanChange.body) || !createUsageConsumeAfterPlanChange.body.error.includes("exceeded")) {
         throw new Error(`Expected error message about exceeding usage limit, but got: ${JSON.stringify(createUsageConsumeAfterPlanChange.body)}`);
     }
-    console.log(`Correctly received error when trying to consume 11 units of usage for user ${userId} after plan change: ${createUsageConsumeAfterPlanChange.body.error}`)
+    if (!('rejectedBy' in createUsageConsumeAfterPlanChange.body) || createUsageConsumeAfterPlanChange.body.rejectedBy !== "user") {
+        throw new Error(`Expected rejectedBy to be "user", but got: ${JSON.stringify(createUsageConsumeAfterPlanChange.body)}`);
+    }
+    console.log(`Correctly received error when trying to consume 11 units of usage for user ${userId} after plan change: ${createUsageConsumeAfterPlanChange.body.error}, rejected by: ${createUsageConsumeAfterPlanChange.body.rejectedBy}`)
     const createPremiumUser = await request<{ userId: string, email: string, planName: string} | { error: string }>(`/users`, 'POST', apiKey, {
         email: `premium-user-${randomUUID()}@example.com`,
         planName: "Premium"
@@ -117,7 +120,7 @@ export async function main() {
     }
     const premiumUserId = createPremiumUser.body.userId;
     console.log(`Created premium user ${createPremiumUser.body.email} with ID ${premiumUserId}`);
-    const createUsageConsumePremiumUser = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, error: string }>(`/usage/consume`, 'POST', apiKey, {
+    const createUsageConsumePremiumUser = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
         userId: premiumUserId,
         requestId: randomUUID(),
         units: 97
@@ -139,7 +142,7 @@ export async function main() {
         throw new Error(`Failed to update account plan: ${JSON.stringify(patchAccountPlanToStarter.body)}`);
     }
     console.log(`Updated account plan to Starter for account ${createAccount.body.accountId}`);
-    const createUsageConsumeAfterDowngrade = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, error: string }>(`/usage/consume`, 'POST', apiKey, {
+    const createUsageConsumeAfterDowngrade = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
         userId: premiumUserId,
         requestId: randomUUID(),
         units: 2
@@ -150,7 +153,10 @@ export async function main() {
     if (!('error' in createUsageConsumeAfterDowngrade.body) || !createUsageConsumeAfterDowngrade.body.error.includes("exceeded")) {
         throw new Error(`Expected error message about exceeding usage limit after downgrade, but got: ${JSON.stringify(createUsageConsumeAfterDowngrade.body)}`);
     }
-    console.log(`Correctly received error when trying to consume 2 units of usage for premium user ${premiumUserId} after plan downgrade: ${createUsageConsumeAfterDowngrade.body.error}`)
+    if (!('rejectedBy' in createUsageConsumeAfterDowngrade.body) || createUsageConsumeAfterDowngrade.body.rejectedBy !== "account") {
+        throw new Error(`Expected rejectedBy to be "account" after downgrade, but got: ${JSON.stringify(createUsageConsumeAfterDowngrade.body)}`);
+    }
+    console.log(`Correctly received error when trying to consume 2 units of usage for premium user ${premiumUserId} after plan downgrade: ${createUsageConsumeAfterDowngrade.body.error}, rejected by: ${createUsageConsumeAfterDowngrade.body.rejectedBy}`)
     const patchAccountPlanToPro = await request<{accountId: string, accountName: string, planName: string} | { error: string }>('/accounts/me/plan', 'PATCH', apiKey, {
         planName: "Pro"
     });
@@ -161,7 +167,7 @@ export async function main() {
         throw new Error(`Failed to update account plan: ${JSON.stringify(patchAccountPlanToPro.body)}`);
     }
     console.log(`Updated account plan to Pro for account ${createAccount.body.accountId}`);
-    const createUsageConsumeAfterUpgrade = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, error: string }>(`/usage/consume`, 'POST', apiKey, {
+    const createUsageConsumeAfterUpgrade = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
         userId: premiumUserId,
         requestId: randomUUID(),
         units: 2
@@ -183,7 +189,6 @@ export async function main() {
         throw new Error(`Expected error message about exceeding the new plan's monthly limit, but got: ${JSON.stringify(patchAccountPlanToStarterAgain.body)}`);
     }
     console.log(`Correctly received error when trying to downgrade account plan to Starter due to exceeding monthly limit: ${patchAccountPlanToStarterAgain.body.error}`);
-
 }
 
 main().catch(err => {
