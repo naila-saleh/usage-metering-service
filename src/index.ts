@@ -11,9 +11,8 @@ import {
     getUsageByRequestId,
     getAccountUsageHistory,
     getUserUsageHistory,
-    getMonthlyAccountUsage
 } from "./db/queries/usages";
-import {consumeUsage, getCurrentSubscriptionCycle, getUsageSummary} from "./services/usage-service";
+import {consumeUsage, getUsageSummary} from "./services/usage-service";
 
 
 const app = express();
@@ -43,7 +42,10 @@ const middlewareAuthenticateApiKey: RequestHandler =
         next();
     };
 
-
+function ensureIdIsUUID(id: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+}
 app.post("/accounts", async (req, res) => {
     const { name, planName } = req.body;
     if (!name || !planName || typeof name !== 'string' || typeof planName !== 'string' || name.trim() === '' || planName.trim() === '') {
@@ -97,10 +99,20 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
     if (!userId || !requestId || !units || typeof userId !== 'string' || typeof requestId !== 'string' || typeof units !== 'number' || userId.trim() === '' || requestId.trim() === '') {
         return res.status(400).json({ error: "Missing required fields: userId, requestId, units" });
     }
+    if (!ensureIdIsUUID(userId) || !ensureIdIsUUID(requestId)) {
+        return res.status(400).json({ error: "userId and requestId must be valid UUIDs" });
+    }
     if (!Number.isFinite(units) || !Number.isInteger(units) || units <= 0) {
         return res.status(400).json({ error: "Units must be a positive integer" });
     }
     const account = res.locals.account;
+    const user = await getUserAndSubplanByUserId(userId, account.id);
+    if (user === undefined) {
+        return res.status(404).json({ error: "User not found" });
+    }
+    if (!account.is_active || !user.users.is_active) {
+        return res.status(403).json({ error: "Account or user is inactive" });
+    }
     try {
         const result = await consumeUsage(account.id, userId, requestId, units);
         if (result){
@@ -186,20 +198,12 @@ app.patch("/accounts/me/plan", middlewareAuthenticateApiKey, async (req, res) =>
     if (!plan || !plan.is_active) {
         return res.status(400).json({ error: "Plan not found" });
     }
-    let subplan = await getSubplanByName(plan.id, planName);
+    const subplan = await getSubplanByName(plan.id, planName);
     if (!subplan || !subplan.is_active || (subplan.created_by_account_id !== account.id && !subplan.is_system_plan)) {
         return res.status(400).json({ error: "Subplan not found" });
     }
     if (account.subplan_id === subplan.id) {
         return res.status(400).json({ error: "Account is already on this plan" });
-    }
-    const {start, end} = getCurrentSubscriptionCycle(account.subscription_started_at);
-    let monthlyUsage = await getMonthlyAccountUsage(account.id, start, end);
-    if (!subplan) {
-        return res.status(500).json({ error: "Failed to retrieve new subplan" });
-    }
-    if (monthlyUsage > subplan.monthly_limit) {
-        return res.status(409).json({ error: "Cannot downgrade plan due to current usage exceeding the new plan's monthly limit" });
     }
     const updatedAccount = await updateAccountSubplan(account.id, subplan.id);
     if (!updatedAccount) {

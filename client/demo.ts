@@ -182,13 +182,38 @@ export async function main() {
     const patchAccountPlanToStarterAgain = await request<{accountId: string, accountName: string, planName: string} | { error: string }>('/accounts/me/plan', 'PATCH', apiKey, {
         planName: "Starter"
     });
-    if (patchAccountPlanToStarterAgain.code !== 409) {
-        throw new Error(`Expected 409 Conflict when downgrading account plan when monthly usage exceeds the Starter limit, but got: ${patchAccountPlanToStarterAgain.code}`);
+    if (patchAccountPlanToStarterAgain.code !== 200) {
+        throw new Error(`Failed to update account plan: ${patchAccountPlanToStarterAgain.code}`);
     }
-    if (!('error' in patchAccountPlanToStarterAgain.body)) {
-        throw new Error(`Expected error message about exceeding the new plan's monthly limit, but got: ${JSON.stringify(patchAccountPlanToStarterAgain.body)}`);
+    if (!('planName' in patchAccountPlanToStarterAgain.body) || patchAccountPlanToStarterAgain.body.planName !== "Starter") {
+        throw new Error(`Failed to update account plan: ${JSON.stringify(patchAccountPlanToStarterAgain.body)}`);
     }
-    console.log(`Correctly received error when trying to downgrade account plan to Starter due to exceeding monthly limit: ${patchAccountPlanToStarterAgain.body.error}`);
+    console.log(`Updated account plan to Starter for account ${createAccount.body.accountId}`);
+    const createUsageConsumeAfterDowngradeAgain = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
+        userId: premiumUserId,
+        requestId: randomUUID(),
+        units: 2
+    });
+    if (createUsageConsumeAfterDowngradeAgain.code !== 403) {
+        throw new Error(`Expected 403 Forbidden when consuming usage after plan downgrade again, but got: ${createUsageConsumeAfterDowngradeAgain.code}`);
+    }
+    if (!('error' in createUsageConsumeAfterDowngradeAgain.body) || !createUsageConsumeAfterDowngradeAgain.body.error.includes("exceeded")) {
+        throw new Error(`Expected error message about exceeding usage limit after downgrade again, but got: ${JSON.stringify(createUsageConsumeAfterDowngradeAgain.body)}`);
+    }
+    if (!('rejectedBy' in createUsageConsumeAfterDowngradeAgain.body) || createUsageConsumeAfterDowngradeAgain.body.rejectedBy !== "account") {
+        throw new Error(`Expected rejectedBy to be "account" after downgrade again, but got: ${JSON.stringify(createUsageConsumeAfterDowngradeAgain.body)}`);
+    }
+    console.log(`Correctly received error when trying to consume 2 units of usage for premium user ${premiumUserId} after plan downgrade again: ${createUsageConsumeAfterDowngradeAgain.body.error}, rejected by: ${createUsageConsumeAfterDowngradeAgain.body.rejectedBy}`);
+    const getUsageSummary = await request<{ account: { monthlyLimit: number, used: number, remaining: number, }, user: { monthlyLimit: number, used: number, remaining: number } } | { error: string }>(`/usage/summary?userId=${premiumUserId}`, 'GET', apiKey);
+    if (getUsageSummary.code !== 200) {
+        throw new Error(`Failed to get usage summary: ${getUsageSummary.code}`);
+    }
+    if (!('account' in getUsageSummary.body) || !('user' in getUsageSummary.body)) {
+        throw new Error(`Failed to get usage summary: ${JSON.stringify(getUsageSummary.body)}`);
+    }
+    console.log(`Usage summary for account ${createAccount.body.accountId} and user ${premiumUserId}:`);
+    console.log(`Account - Monthly Limit: ${getUsageSummary.body.account.monthlyLimit}, Used: ${getUsageSummary.body.account.used}, Remaining: ${getUsageSummary.body.account.remaining}`);
+    console.log(`User - Monthly Limit: ${getUsageSummary.body.user.monthlyLimit}, Used: ${getUsageSummary.body.user.used}, Remaining: ${getUsageSummary.body.user.remaining}`);
 }
 
 main().catch(err => {
