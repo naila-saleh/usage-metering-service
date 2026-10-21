@@ -24,6 +24,9 @@ export async function consumeUsage(accountId: string, userId: string, requestId:
             if (existingUsage && existingUsage.amount === units) {
                 return existingUsage.is_success? existingUsage :new Error(existingUsage.rejected_reason);
             }
+            if (existingUsage && existingUsage.amount !== units) {
+                return new Error(`Request with ID ${requestId} has already been processed with a different amount: ${existingUsage.amount}`);
+            }
             const user = await getUserAndSubplanByUserId(userId, accountId, tx);
             if (!user) {
                 return new Error(`User with ID ${userId} not found`);

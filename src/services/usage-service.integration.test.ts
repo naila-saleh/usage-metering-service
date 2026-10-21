@@ -81,7 +81,7 @@ describe('consumeUsage Integration Tests', () => {
     });
 
     it( 'persists a rejected usage in PostgreSQL when account exceeds max_request_limit', async () => {
-        const units = 11; // account max_request_limit is 10
+        const units = 101; // account max_request_limit is 100
         await expect(
             consumeUsage(account!.id, premiumUser!.id, premiumRequestId, units)
         ).rejects.toThrow("exceeds the maximum request limit for account");
@@ -215,7 +215,7 @@ describe('consumeUsage Integration Tests', () => {
         expect(usageEntriesWithRequestId.length).toBe(1); // Only one entry should exist for the same requestId
     });
 
-    it ('retrying a previously rejected usage with the same requestId but different amount does create a new usage entry', async () => {
+    it ('retrying a previously rejected usage with the same requestId but different amount does not create a new usage entry', async () => {
         const units = 11; // user max_request_limit is 10
         await expect(
             consumeUsage(account!.id, user!.id, requestId, units)
@@ -236,18 +236,22 @@ describe('consumeUsage Integration Tests', () => {
         const newUnits = 2;
         await expect(
             consumeUsage(account!.id, user!.id, requestId, newUnits)
-        ).rejects.toThrow("exceeds the maximum request limit for user");
+        ).rejects.toThrow(`Request with ID ${requestId} has already been processed with a different amount: ${units}`);
         const result2 = await getUsageByRequestId(requestId, account!.id);
         expect(result2).toBeDefined();
         expect(result2).toMatchObject({
             request_id: requestId,
             account_id: account!.id,
             user_id: user!.id,
-            amount: newUnits,
-            is_success: true, // The new entry should be successful since the amount is within the limit
-            rejected_by: "",
-            rejected_reason: "",
+            amount: units, // The original amount should still be present
+            is_success: false,
+            rejected_by: "user",
+            rejected_reason: "User max request limit exceeded",
         });
+
+        const usageHistory = await getAccountUsageHistory(account!.id, 10, 1);
+        const usageEntriesWithRequestId = usageHistory.filter(entry => entry.request_id === requestId);
+        expect(usageEntriesWithRequestId.length).toBe(1); // Only one entry should exist for the same requestId
     });
 
     afterEach(async () => {
