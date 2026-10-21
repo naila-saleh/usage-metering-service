@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import {describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Server } from 'node:http';
 import app from './index';
-import { randomBytes, createHash } from "node:crypto";
+import {randomBytes, createHash, randomUUID} from "node:crypto";
 import { createAccount, deleteAccountById } from './db/queries/accounts';
 import { createUser, deleteUserById } from './db/queries/users';
 import { getSubplanByName } from './db/queries/subplans';
@@ -119,6 +119,41 @@ describe("Usage Metering Service", () => {
             },
         });
         expect(usageHistory.status).toBe(404);
+    });
+
+    it('should return 409 when retrying a request with a different amount.', async () => {
+        if (testUser1 === undefined) {
+            throw new Error("Test user is not defined");
+        }
+        const requestId = randomUUID();
+        const usageAmount = 2;
+        const usageResponse1 = await fetch(`${baseUrl}/usage/consume`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey1,
+            },
+            body: JSON.stringify({
+                userId: testUser1.id,
+                units: usageAmount,
+                requestId: requestId,
+            }),
+        });
+        expect(usageResponse1.status).toBe(200);
+
+        const usageResponse2 = await fetch(`${baseUrl}/usage/consume`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey1,
+            },
+            body: JSON.stringify({
+                userId: testUser1.id,
+                units: usageAmount + 1, // Different amount
+                requestId: requestId, // Same requestId
+            }),
+        });
+        expect(usageResponse2.status).toBe(409); // Expecting conflict due to different amount with same requestId
     });
 
     afterAll(async () => {

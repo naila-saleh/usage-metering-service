@@ -114,6 +114,12 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
         return res.status(403).json({ error: "Account or user is inactive" });
     }
     try {
+        const existingUsage = await getUsageByRequestId(requestId, account.id);
+        if (existingUsage) {
+            if (existingUsage.amount !== units) {
+                return res.status(409).json({ error: `Request with ID ${requestId} has already been processed with a different amount: ${existingUsage.amount}` });
+            }
+        }
         const result = await consumeUsage(account.id, userId, requestId, units);
         if (result){
             if (result.is_success) {
@@ -317,9 +323,9 @@ app.get("/account/me/userplans", middlewareAuthenticateApiKey, async (req, res) 
     return res.status(200).json(userPlans);
 });
 
-app.get("/user/me/plan/:userId", middlewareAuthenticateApiKey, async (req, res) => {
+app.get("/users/:userId/plan", middlewareAuthenticateApiKey, async (req, res) => {
     const account = res.locals.account;
-    const userId = req.query.userId;
+    const userId = req.params.userId;
     if (userId === undefined || typeof userId !== 'string' || userId.trim() === '' || !ensureIdIsUUID(userId)) {
         return res.status(400).json({ error: "Missing required field: userId" });
     }
