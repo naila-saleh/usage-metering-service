@@ -150,7 +150,7 @@ app.get("/usage/history", middlewareAuthenticateApiKey, async (req, res) => {
     }
     const account = res.locals.account;
     if (userId !== undefined) {
-        if (typeof userId !== 'string' || userId.trim() === '') {
+        if (typeof userId !== 'string' || userId.trim() === '' || !ensureIdIsUUID(userId)) {
             return res.status(400).json({ error: "Invalid userId" });
         }
         const user = await getUserAndSubplanByUserId(userId as string, account.id);
@@ -172,7 +172,7 @@ app.get("/usage/summary", middlewareAuthenticateApiKey, async (req, res) => {
     const account = res.locals.account;
     const userId = req.query.userId;
     if (userId !== undefined) {
-        if (typeof userId !== 'string' || userId.trim() === '') {
+        if (typeof userId !== 'string' || userId.trim() === '' || !ensureIdIsUUID(userId)) {
             return res.status(400).json({ error: "Invalid userId" });
         }
         const user = await getUserAndSubplanByUserId(userId as string, account.id);
@@ -238,7 +238,7 @@ app.patch("/users/:userId/plan", middlewareAuthenticateApiKey, async (req, res) 
     if (!planName || typeof planName !== 'string' || planName.trim() === '') {
         return res.status(400).json({ error: "Missing required field: planName" });
     }
-    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+    if (!userId || typeof userId !== 'string' || userId.trim() === '' || !ensureIdIsUUID(userId)) {
         return res.status(400).json({ error: "Missing required field: userId" });
     }
     const account = res.locals.account;
@@ -269,7 +269,7 @@ app.patch("/users/:userId/plan", middlewareAuthenticateApiKey, async (req, res) 
 
 app.get("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, res) => {
     const planId = req.params.planId;
-    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+    if (!planId || typeof planId !== 'string' || planId.trim() === '' || !ensureIdIsUUID(planId)) {
         return res.status(400).json({ error: "Missing required field: planId" });
     }
     const plan = await getPlanById(planId);
@@ -320,7 +320,7 @@ app.get("/account/me/userplans", middlewareAuthenticateApiKey, async (req, res) 
 app.get("/user/me/plan/:userId", middlewareAuthenticateApiKey, async (req, res) => {
     const account = res.locals.account;
     const userId = req.query.userId;
-    if (userId === undefined || typeof userId !== 'string' || userId.trim() === '') {
+    if (userId === undefined || typeof userId !== 'string' || userId.trim() === '' || !ensureIdIsUUID(userId)) {
         return res.status(400).json({ error: "Missing required field: userId" });
     }
     const user = await getUserAndSubplanByUserId(userId, account.id);
@@ -332,7 +332,7 @@ app.get("/user/me/plan/:userId", middlewareAuthenticateApiKey, async (req, res) 
 
 app.post("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, res) => {
     const planId = req.params.planId;
-    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+    if (!planId || typeof planId !== 'string' || planId.trim() === '' || !ensureIdIsUUID(planId)) {
         return res.status(400).json({ error: "Missing required field: planId" });
     }
     const { name, description, price, monthly_limit, max_request_limit } = req.body;
@@ -356,11 +356,11 @@ app.post("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, re
 
 app.patch("/plans/:planId/subplans/:subplanId", middlewareAuthenticateApiKey, async (req, res) => {
     const planId = req.params.planId;
-    if (!planId || typeof planId !== 'string' || planId.trim() === '') {
+    if (!planId || typeof planId !== 'string' || planId.trim() === '' || !ensureIdIsUUID(planId)) {
         return res.status(400).json({ error: "Missing required field: planId" });
     }
     const subplanId = req.params.subplanId;
-    if (!subplanId || typeof subplanId !== 'string' || subplanId.trim() === '') {
+    if (!subplanId || typeof subplanId !== 'string' || subplanId.trim() === '' || !ensureIdIsUUID(subplanId)) {
         return res.status(400).json({ error: "Missing required field: subplanId" });
     }
     const { name, description, price, monthly_limit, max_request_limit, is_active } = req.body;
