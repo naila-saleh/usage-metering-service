@@ -2,71 +2,92 @@
 
 ## Overview
 
-This report documents the performance test for the Usage Metering Service. The test is implemented in `src/services/performance.test.ts` and exercises the `POST /usage/consume` endpoint through the running Express application.
+This report documents the three performance scenarios implemented in `src/services/performance.test.ts`. Each scenario sends concurrent `POST /usage/consume` requests through the Express application and records batch duration, average response time, throughput, and P95 response time.
 
-The primary scenario sends 100 concurrent requests. Each request consumes one usage unit for the same test user and account. The test verifies that all 100 requests succeed and that both the account and user usage totals equal 100.
+The results below are the measurements supplied from successful executions of the test. The test environment's hardware and software specifications were not recorded, so these values should be interpreted as environment-dependent observations rather than universal performance guarantees.
 
-## Test environment and execution
+## Test command and methodology
 
-The performance test is run with the project's `test:performance` script:
+Run the performance tests with:
 
 ```text
 npm run test:performance
 ```
 
-That script:
+The command runs Vitest in non-watch mode against `src/services/performance.test.ts`, with the test environment loaded from `.env.test`.
 
-- sets `NODE_ENV=test`;
-- loads environment variables from `.env.test` using `dotenv-cli`;
-- runs Vitest in non-watch mode with `--run`;
-- excludes files under `dist`; and
-- targets `src/services/performance.test.ts`.
+For each scenario, the test records the elapsed time for each request and the elapsed time for the complete concurrent batch:
 
-The test starts the Express application on `127.0.0.1` using an operating-system-assigned port. It creates temporary test accounts and users using the configured test database, obtains their API keys, and removes the test data and closes the server after the tests complete. The database must therefore be available with the test configuration. Before the test runs, the plans and subplans looked up by `beforeAll` must exist: Account Plans with Starter and Pro subplans, and User Plans with Basic and Premium subplans. The performance test does not create these records. The repository's `seed` and `seed:test` scripts can create them when missing, but `npm run test:performance` does not run seeding or migrations automatically.
+- **Total duration:** time from launching the concurrent requests until all responses are received.
+- **Average response time:** arithmetic mean of the individual request times.
+- **Requests per second (RPS):** `request count / (total duration in milliseconds / 1000)`.
+- **P95:** the sorted response time at index `ceil(0.95 × request count) - 1`.
 
-No hardware or software specifications beyond the repository configuration are assumed in this report. Timing results can vary with the local machine, database, operating-system scheduling, network stack, and current system load.
+All displayed test runs passed all three test assertions. The repository does not store individual logs for these historical measurements, so rerunning the command will produce new measurements that may differ.
 
-## Methodology and metrics
+## Scenario 1: 10 concurrent requests near the rate limit
 
-For each of the 100 requests, the test records the elapsed time from immediately before `fetch` to immediately after the response is received. It also records the elapsed time for the complete batch, from launching the concurrent requests until all responses have been received.
+Before the concurrent batch, the test consumes 99 units using nine sequential requests of 10 units and one sequential request of 9 units. It then sends 10 concurrent requests of one unit each for the same account and user. The expected result is one HTTP 200 response and nine HTTP 403 responses. The test also verifies that the account and user usage totals are both 100 units.
 
-The metrics are calculated as follows:
+### Measurements
 
-- **Total duration:** elapsed time for the complete batch of 100 concurrent requests, in milliseconds.
-- **Average latency:** arithmetic mean of the 100 individual request times, in milliseconds.
-- **Throughput (RPS):** `100 / (total duration in milliseconds / 1000)`, or equivalently `100,000 / total duration in milliseconds`.
-- **p95 response time:** the response time at the index `ceil(0.95 × 100) - 1` after the 100 individual response times are sorted in ascending order. This is the 95th-percentile value used by the test.
-
-The test also counts HTTP 200 responses and HTTP 403 responses. It requires 100 successful responses and zero rejected responses. It then requests the usage summary and requires `summary.account.used` and `summary.user.used` to both equal 100.
-
-## Results
-
-The table below contains measurements recorded during five executions of the main performance test. The repository does not contain individual output logs or stored measurement files for those executions. Running `npm run test:performance` again will execute the test and print new measurements, but will not necessarily reproduce these historical values.
-
-| Run | Total Duration (ms) | Average Latency (ms) | RPS | p95 (ms) |
+| Run | Total duration (ms) | Average response time (ms) | RPS | P95 (ms) |
 |---:|---:|---:|---:|---:|
-| 1 | 631.55 | 383.08 | 158.34 | 600.30 |
-| 2 | 634.77 | 380.34 | 157.54 | 604.41 |
-| 3 | 619.37 | 372.95 | 161.45 | 590.19 |
-| 4 | 666.06 | 396.38 | 150.14 | 636.44 |
-| 5 | 596.24 | 352.65 | 167.72 | 567.03 |
-| **Average** | **629.60** | **377.08** | **159.04** | **599.67** |
+| 1 | 88.97 | 64.02 | 112.39 | 87.73 |
+| 2 | 86.20 | 61.86 | 116.01 | 84.94 |
+| 3 | 89.92 | 65.48 | 111.21 | 88.52 |
+| 4 | 88.54 | 61.96 | 112.95 | 87.39 |
+| 5 | 89.44 | 65.19 | 111.81 | 88.63 |
+| 6 | 104.87 | 77.67 | 95.36 | 103.18 |
 
-All five runs passed the test assertions for the main scenario:
+## Scenario 2: 100 concurrent successful requests for one account and user
 
-- 100 of 100 requests returned HTTP 200.
-- 0 requests returned HTTP 403.
-- The account usage total was 100 units.
-- The user usage total was 100 units.
+The test sends 100 concurrent requests of one unit using one account and one user. It expects all 100 requests to return HTTP 200 and none to return HTTP 403. It then verifies that both the account and user usage totals are 100 units.
 
-## Additional quota-limit test
+### Measurements
 
-The same test file contains a separate scenario for behavior near a quota limit. It first sends nine sequential requests consuming 10 units each and one sequential request consuming 9 units, bringing the usage to 99 units. It then sends 10 concurrent requests consuming one unit each.
+The supplied results contain seven runs for this scenario; all seven are included.
 
-That scenario expects exactly one HTTP 200 response and nine HTTP 403 responses, and verifies that the account and user usage totals are both 100. It also logs the same duration, average latency, RPS, and p95-style measurements for that group of 10 requests, but the five-run results reported above are for the separate 100-request successful scenario.
+| Run | Total duration (ms) | Average response time (ms) | RPS | P95 (ms) |
+|---:|---:|---:|---:|---:|
+| 1 | 723.62 | 463.49 | 138.19 | 691.41 |
+| 2 | 636.16 | 391.07 | 157.19 | 607.22 |
+| 3 | 664.23 | 421.37 | 150.55 | 634.12 |
+| 4 | 667.19 | 404.28 | 149.88 | 636.49 |
+| 5 | 635.95 | 382.25 | 157.25 | 605.30 |
+| 6 | 627.60 | 381.89 | 159.34 | 594.90 |
+| 7 | 652.96 | 401.91 | 153.15 | 623.21 |
 
-## Conclusions
+## Scenario 3: 100 concurrent successful requests across five accounts
 
-The observed averages across the five recorded runs were 629.60 ms for total batch duration, 377.08 ms for average per-request latency, 159.04 requests per second for throughput, and 599.67 ms for p95 response time. For those executions, the test assertions also passed consistently: each main scenario returned 100 HTTP 200 responses and zero HTTP 403 responses, and the reported account and user usage totals were both 100 units.
+The test creates five accounts and one premium user for each account, then distributes 100 concurrent one-unit requests across the five account-user and API-key pairs. It expects all 100 requests to return HTTP 200 and none to return HTTP 403. This scenario measures concurrent successful usage across multiple accounts; it does not perform the account and user summary checks used by Scenario 2.
 
-These observations describe a batch of exactly 100 concurrent requests in the environment where the measurements were recorded. They are not a benchmark proving the service's maximum capacity or sustained-load performance, and they do not guarantee quota correctness under every possible concurrency pattern or workload. Different environments and workloads may produce different results.
+### Measurements
+
+The supplied results contain seven runs for this scenario; all seven are included.
+
+| Run | Total duration (ms) | Average response time (ms) | RPS | P95 (ms) |
+|---:|---:|---:|---:|---:|
+| 1 | 292.18 | 192.76 | 342.25 | 275.85 |
+| 2 | 282.96 | 185.51 | 353.40 | 270.23 |
+| 3 | 283.04 | 189.62 | 353.31 | 271.60 |
+| 4 | 279.85 | 181.99 | 357.34 | 266.80 |
+| 5 | 280.56 | 187.56 | 356.43 | 268.79 |
+| 6 | 282.91 | 184.88 | 353.46 | 270.38 |
+| 7 | 289.83 | 189.34 | 345.03 | 276.65 |
+
+## Summary of means
+
+The means below use all six supplied measurements for Scenario 1 and all seven supplied measurements for Scenarios 2 and 3.
+
+| Scenario | Mean total duration (ms) | Mean average response time (ms) | Mean RPS | Mean P95 (ms) |
+|---|---:|---:|---:|---:|
+| 1: 10 concurrent requests near the rate limit | 91.32 | 66.03 | 109.95 | 90.06 |
+| 2: 100 concurrent requests for one account and user | 658.24 | 406.61 | 152.22 | 627.52 |
+| 3: 100 concurrent requests across five accounts | 284.48 | 187.38 | 351.60 | 271.47 |
+
+## Conclusions and scope
+
+The measurements show the observed timing and throughput for six runs of Scenario 1 and seven runs each of Scenarios 2 and 3. The tests verified the scenario-specific status and usage assertions described above, and all supplied executions passed all three tests.
+
+These results represent batches of 10 or 100 concurrent requests under the unrecorded test environment. They do not establish production capacity, maximum system capacity, sustained-load performance, behavior under larger loads, or guaranteed quota correctness for every possible concurrency pattern or workload. The commands `npm run generate` and `npm run migrate:test` run between some supplied executions were not treated as performance runs because their output contained no performance measurements.

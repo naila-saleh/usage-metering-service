@@ -254,7 +254,7 @@ describe('consumeUsage Integration Tests', () => {
         expect(usageEntriesWithRequestId.length).toBe(1); // Only one entry should exist for the same requestId
     });
 
-    it('should accept one consume usage request out of 5 concurrent requests for the same request ID and units', async () => {
+    it('should successfully process 5 concurrent requests with the same request ID and units while creating only one usage record', async () => {
         const concurrentRequests = 5;
         const units = 2;
         const promises = Array.from({ length: concurrentRequests }, () =>

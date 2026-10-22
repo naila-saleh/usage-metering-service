@@ -14,18 +14,27 @@ export function getCurrentSubscriptionCycle(subscriptionStartedAt: Date, now: Da
 
 export async function consumeUsage(accountId: string, userId: string, requestId: string, units: number) {
     const isUsageExists = await getUsageByRequestId(requestId, accountId);
-    if (!isUsageExists || isUsageExists.is_success === false) {
+    if (!isUsageExists || isUsageExists.is_success === false || isUsageExists.amount !== units || isUsageExists.user_id !== userId || isUsageExists.account_id !== accountId) {
         const result = await db.transaction(async (tx) => {
             const account = await getAccountAndSubplanByAccountId(accountId, tx);
             if (!account) {
                 return new Error(`Account with ID ${accountId} not found`);
             }
             const existingUsage = await getUsageByRequestId(requestId, accountId, tx);
-            if (existingUsage && existingUsage.amount === units) {
-                return existingUsage.is_success? existingUsage :new Error(existingUsage.rejected_reason);
-            }
             if (existingUsage && existingUsage.amount !== units) {
                 return new Error(`Request with ID ${requestId} has already been processed with a different amount: ${existingUsage.amount}`);
+            }
+            if (existingUsage && existingUsage.user_id !== userId) {
+                return new Error(`Request with ID ${requestId} has already been processed for a different user: ${existingUsage.user_id}`);
+            }
+            if (existingUsage && existingUsage.account_id !== accountId) {
+                return new Error(`Request with ID ${requestId} has already been processed for a different account: ${existingUsage.account_id}`);
+            }
+            if (existingUsage && existingUsage.is_success && existingUsage.amount === units) {
+                return existingUsage;
+            }
+            if (existingUsage && !existingUsage.is_success) {
+                return new Error(existingUsage.rejected_reason);
             }
             const user = await getUserAndSubplanByUserId(userId, accountId, tx);
             if (!user) {
