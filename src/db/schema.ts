@@ -1,4 +1,4 @@
-import {pgTable, timestamp, varchar, uuid, boolean, integer, unique, decimal} from "drizzle-orm/pg-core";
+import {pgTable, timestamp, varchar, uuid, boolean, integer, unique, decimal, index} from "drizzle-orm/pg-core";
 
 export const plans = pgTable("plans", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -88,6 +88,8 @@ export const usages = pgTable("usages", {
 }, (table) => {
     return {
         unique_request_constraint: unique("unique_request_constraint").on(table.request_id, table.account_id),
+        index_account_id_and_created_at: index("index_account_id_and_created_at").on(table.account_id, table.created_at),
+        index_user_id_and_created_at: index("index_user_id_and_created_at").on(table.user_id, table.created_at),
     };
 });
 

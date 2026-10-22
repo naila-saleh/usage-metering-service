@@ -43,6 +43,13 @@
       "when": 1792331510759,
       "tag": "0005_giant_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792675900368,
+      "tag": "0006_black_barracuda",
+      "breakpoints": true
     }
   ]
 }

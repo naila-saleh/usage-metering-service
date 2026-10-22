@@ -223,6 +223,120 @@ describe("Usage Metering Service", () => {
         expect(summary.user.used).toBe(100);
     });
 
+    it('should handle concurrent successful usage requests across 5 accounts and report performance metrics', async () => {
+        const proApiKey1 = randomBytes(32).toString('hex');
+        const proApiKey2 = randomBytes(32).toString('hex');
+        const proApiKey3 = randomBytes(32).toString('hex');
+        const proApiKey4 = randomBytes(32).toString('hex');
+        const proApiKey5 = randomBytes(32).toString('hex');
+
+        const proAccount1 = await createAccount({
+            name: `Pro Account 1 ${randomBytes(4).toString('hex')}`,
+            hashed_api_key: createHash("sha256").update(proApiKey1).digest("hex"),
+            subplan_id: accountProSubplan!.id,
+        });
+        const proAccount2 = await createAccount({
+            name: `Pro Account 2 ${randomBytes(4).toString('hex')}`,
+            hashed_api_key: createHash("sha256").update(proApiKey2).digest("hex"),
+            subplan_id: accountProSubplan!.id,
+        });
+        const proAccount3 = await createAccount({
+            name: `Pro Account 3 ${randomBytes(4).toString('hex')}`,
+            hashed_api_key: createHash("sha256").update(proApiKey3).digest("hex"),
+            subplan_id: accountProSubplan!.id,
+        });
+        const proAccount4 = await createAccount({
+            name: `Pro Account 4 ${randomBytes(4).toString('hex')}`,
+            hashed_api_key: createHash("sha256").update(proApiKey4).digest("hex"),
+            subplan_id: accountProSubplan!.id,
+        });
+        const proAccount5 = await createAccount({
+            name: `Pro Account 5 ${randomBytes(4).toString('hex')}`,
+            hashed_api_key: createHash("sha256").update(proApiKey5).digest("hex"),
+            subplan_id: accountProSubplan!.id,
+        });
+
+        const premiumUser1 = await createUser({
+            email: `premiumuser1_${randomBytes(4).toString('hex')}@example.com`,
+            account_id: proAccount1!.id,
+            subplan_id: userPremiumSubplan!.id,
+        });
+        const premiumUser2 = await createUser({
+            email: `premiumuser2_${randomBytes(4).toString('hex')}@example.com`,
+            account_id: proAccount2!.id,
+            subplan_id: userPremiumSubplan!.id,
+        });
+        const premiumUser3 = await createUser({
+            email: `premiumuser3_${randomBytes(4).toString('hex')}@example.com`,
+            account_id: proAccount3!.id,
+            subplan_id: userPremiumSubplan!.id,
+        });
+        const premiumUser4 = await createUser({
+            email: `premiumuser4_${randomBytes(4).toString('hex')}@example.com`,
+            account_id: proAccount4!.id,
+            subplan_id: userPremiumSubplan!.id,
+        });
+        const premiumUser5 = await createUser({
+            email: `premiumuser5_${randomBytes(4).toString('hex')}@example.com`,
+            account_id: proAccount5!.id,
+            subplan_id: userPremiumSubplan!.id,
+        });
+
+        const startTime = performance.now();
+        const requestsTimersInMs: number[] = [];
+        const requests = Array.from({ length: 100 }, async (_, index) => {
+            const userId = [premiumUser1, premiumUser2, premiumUser3, premiumUser4, premiumUser5][index % 5]!.id;
+            const apiKey = [proApiKey1, proApiKey2, proApiKey3, proApiKey4, proApiKey5][index % 5];
+            const start = performance.now();
+            const response = await fetch(`${baseUrl}/usage/consume`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey!
+                },
+                body: JSON.stringify({
+                    userId,
+                    requestId: randomUUID(),
+                    units: 1
+                }),
+            });
+            const end = performance.now();
+            requestsTimersInMs.push(end - start);
+            return response;
+        });
+        const responses = await Promise.all(requests);
+        const endTime = performance.now();
+        const durationMs = endTime - startTime;
+        const averageTimeMs = requestsTimersInMs.reduce((a, b) => a + b, 0) / requestsTimersInMs.length;
+        console.log(`Total duration for 100 concurrent requests across 5 accounts: ${durationMs.toFixed(2)} ms`);
+        console.log(`Average time per request: ${averageTimeMs.toFixed(2)} ms`);
+        const RPS = 100 / (durationMs / 1000);
+        console.log(`Requests per second (RPS): ${RPS.toFixed(2)}`);
+        const sortedTimers = [...requestsTimersInMs].sort((a, b) => a - b);
+        const p95 = sortedTimers[Math.ceil(0.95 * sortedTimers.length) - 1];
+        if (p95 === undefined){
+            throw new Error("Failed to calculate 95th percentile response time");
+        }
+        console.log(`95th percentile response time for 100 concurrent requests across 5 accounts: ${p95.toFixed(2)} ms`);
+
+        const successCount = responses.filter(response => response.status === 200).length;
+        const rejectedCount = responses.filter(response => response.status === 403).length;
+        expect(successCount).toBe(100);
+        expect(rejectedCount).toBe(0);
+
+        // Clean up created accounts and users
+        await deleteUserById(premiumUser1!.id, proAccount1!.id);
+        await deleteUserById(premiumUser2!.id, proAccount2!.id);
+        await deleteUserById(premiumUser3!.id, proAccount3!.id);
+        await deleteUserById(premiumUser4!.id, proAccount4!.id);
+        await deleteUserById(premiumUser5!.id, proAccount5!.id);
+        await deleteAccountById(proAccount1!.id);
+        await deleteAccountById(proAccount2!.id);
+        await deleteAccountById(proAccount3!.id);
+        await deleteAccountById(proAccount4!.id);
+        await deleteAccountById(proAccount5!.id);
+    });
+
     afterAll(async () => {
         try {
             // Clean up test data after tests are done
