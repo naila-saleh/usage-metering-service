@@ -254,6 +254,38 @@ describe('consumeUsage Integration Tests', () => {
         expect(usageEntriesWithRequestId.length).toBe(1); // Only one entry should exist for the same requestId
     });
 
+    it('should accept one consume usage request out of 5 concurrent requests for the same request ID and units', async () => {
+        const concurrentRequests = 5;
+        const units = 2;
+        const promises = Array.from({ length: concurrentRequests }, () =>
+            consumeUsage(account!.id, user!.id, requestId, units).then(
+                (result) => ({ success: true, result }),
+                (error) => ({ success: false, error })
+            )
+        );
+
+        const results = await Promise.allSettled(promises);
+        const successfulResults = results.filter(r => r.status === 'fulfilled' && r.value.success);
+        const failedResults = results.filter(r => r.status === 'fulfilled' && !r.value.success);
+
+        expect(successfulResults.length).toBe(concurrentRequests);
+        expect(failedResults.length).toBe(0);
+
+        const usageEntry = await getUsageByRequestId(requestId, account!.id);
+        expect(usageEntry).toBeDefined();
+        expect(usageEntry).toMatchObject({
+            request_id: requestId,
+            account_id: account!.id,
+            user_id: user!.id,
+            amount: units,
+            is_success: true,
+        });
+
+        const usageHistory = await getAccountUsageHistory(account!.id, 10, 1);
+        const usageEntriesWithRequestId = usageHistory.filter(entry => entry.request_id === requestId);
+        expect(usageEntriesWithRequestId.length).toBe(1); // Only one entry should exist for the same requestId
+    });
+
     afterEach(async () => {
         // Clean up the created usage, account and user
         if (account) {

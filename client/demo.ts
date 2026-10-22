@@ -1,5 +1,6 @@
 import {existsSync} from "node:fs";
 import { randomUUID } from "node:crypto";
+import { NewSubplan } from "../src/db/schema.js";
 
 type HttpMethod = 'GET' | 'POST' | 'PATCH';
 const envFile = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
@@ -214,6 +215,101 @@ export async function main() {
     console.log(`Usage summary for account ${createAccount.body.accountId} and user ${premiumUserId}:`);
     console.log(`Account - Monthly Limit: ${getUsageSummary.body.account.monthlyLimit}, Used: ${getUsageSummary.body.account.used}, Remaining: ${getUsageSummary.body.account.remaining}`);
     console.log(`User - Monthly Limit: ${getUsageSummary.body.user.monthlyLimit}, Used: ${getUsageSummary.body.user.used}, Remaining: ${getUsageSummary.body.user.remaining}`);
+
+    const getPlans = await request<{ accountPlans: NewSubplan[], userPlans: NewSubplan[] } | { error: string }>('/plans', 'GET', apiKey);
+    if (getPlans.code !== 200) {
+        throw new Error(`Failed to get plans: ${getPlans.code}`);
+    }
+    if (!('userPlans' in getPlans.body) || getPlans.body.userPlans.length === 0) {
+        throw new Error(`Failed to get user plans: ${JSON.stringify(getPlans.body)}`);
+    }
+    const planId = getPlans.body.userPlans[0].plan_id;
+    console.log(`Retrieved user plan ID: ${planId}`);
+    const createSubplan = await request< NewSubplan  | { error: string }>(`/plans/${planId}/subplans`, 'POST', apiKey, {
+        name: `Demo Subplan ${randomUUID()}`,
+        description: 'Demo subplan for usage metering service',
+        price: "5.99",
+        monthly_limit: 50,
+        max_request_limit: 5,
+    });
+    if (createSubplan.code !== 201) {
+        throw new Error(`Failed to create subplan: ${createSubplan.code}`);
+    }
+    if (!('plan_id' in createSubplan.body)) {
+        throw new Error(`Failed to create subplan: ${JSON.stringify(createSubplan.body)}`);
+    }
+    console.log(`Created subplan with ID: ${createSubplan.body.id}`);
+    const subplanId = createSubplan.body.id;
+    const subplanName = createSubplan.body.name;
+    const subplanCreateUser = await request<{ userId: string, email: string, planName: string} | { error: string }>(`/users`, 'POST', apiKey, {
+        email: `subplan-user-${randomUUID()}@example.com`,
+        planName: subplanName,
+    });
+    if (subplanCreateUser.code !== 201) {
+        throw new Error(`Failed to create user with subplan: ${subplanCreateUser.code}`);
+    }
+    if (!('userId' in subplanCreateUser.body)) {
+        throw new Error(`Failed to create user with subplan: ${JSON.stringify(subplanCreateUser.body)}`);
+    }
+    const subplanUserId = subplanCreateUser.body.userId;
+    console.log(`Created user ${subplanCreateUser.body.email} with ID ${subplanUserId} under subplan ${subplanId}`);
+    const updateAccountToPro = await request<{accountId: string, accountName: string, planName: string} | { error: string }>('/accounts/me/plan', 'PATCH', apiKey, {
+        planName: "Pro"
+    });
+    if (updateAccountToPro.code !== 200) {
+        throw new Error(`Failed to update account plan to Pro: ${updateAccountToPro.code}`);
+    }
+    if (!('planName' in updateAccountToPro.body) || updateAccountToPro.body.planName !== "Pro") {
+        throw new Error(`Failed to update account plan to Pro: ${JSON.stringify(updateAccountToPro.body)}`);
+    }
+    console.log(`Updated account plan to Pro for account ${createAccount.body.accountId}`);
+    const createUsageConsumeSubplanUser = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
+        userId: subplanUserId,
+        requestId: randomUUID(),
+        units: 6
+    });
+    if (createUsageConsumeSubplanUser.code !== 403) {
+        throw new Error(`Expected 403 Forbidden when consuming usage for subplan user exceeding limit, but got: ${createUsageConsumeSubplanUser.code}`);
+    }
+    if (!('error' in createUsageConsumeSubplanUser.body) || !createUsageConsumeSubplanUser.body.error.includes("exceeded")) {
+        throw new Error(`Expected error message about exceeding usage limit for subplan user, but got: ${JSON.stringify(createUsageConsumeSubplanUser.body)}`);
+    }
+    if (!('rejectedBy' in createUsageConsumeSubplanUser.body) || createUsageConsumeSubplanUser.body.rejectedBy !== "user") {
+        throw new Error(`Expected rejectedBy to be "user" for subplan user, but got: ${JSON.stringify(createUsageConsumeSubplanUser.body)}`);
+    }
+    console.log(`Correctly received error when trying to consume 6 units of usage for subplan user ${subplanUserId}: ${createUsageConsumeSubplanUser.body.error}, rejected by: ${createUsageConsumeSubplanUser.body.rejectedBy}`);
+    const updateSubplan = await request< NewSubplan  | { error: string }>(`/plans/${planId}/subplans/${subplanId}`, 'PATCH', apiKey, {
+        max_request_limit: 20,
+    });
+    if (updateSubplan.code !== 200) {
+        throw new Error(`Failed to update subplan: ${updateSubplan.code}`);
+    }
+    if (!('plan_id' in updateSubplan.body) || updateSubplan.body.max_request_limit !== 20) {
+        throw new Error(`Failed to update subplan: ${JSON.stringify(updateSubplan.body)}`);
+    }
+    console.log(`Updated subplan ${subplanId} max_request_limit to 20`);
+    const createUsageConsumeSubplanUserAfterUpdate = await request<{ success: boolean, unitsConsumed: number } | { success: boolean, rejectedBy: string, error: string }>(`/usage/consume`, 'POST', apiKey, {
+        userId: subplanUserId,
+        requestId: randomUUID(),
+        units: 6
+    });
+    if (createUsageConsumeSubplanUserAfterUpdate.code !== 200) {
+        throw new Error(`Failed to consume usage for subplan user after update: ${createUsageConsumeSubplanUserAfterUpdate.code}`);
+    }
+    if (!('success' in createUsageConsumeSubplanUserAfterUpdate.body) || !createUsageConsumeSubplanUserAfterUpdate.body.success) {
+        throw new Error(`Failed to consume usage for subplan user after update: ${JSON.stringify(createUsageConsumeSubplanUserAfterUpdate.body)}`);
+    }
+    console.log(`Consumed 6 units of usage for subplan user ${subplanUserId} after subplan update`);
+    const getSubplanUsageSummary = await request<{ account: { monthlyLimit: number, used: number, remaining: number, }, user: { monthlyLimit: number, used: number, remaining: number } } | { error: string }>(`/usage/summary?userId=${subplanUserId}`, 'GET', apiKey);
+    if (getSubplanUsageSummary.code !== 200) {
+        throw new Error(`Failed to get usage summary for subplan user: ${getSubplanUsageSummary.code}`);
+    }
+    if (!('account' in getSubplanUsageSummary.body) || !('user' in getSubplanUsageSummary.body)) {
+        throw new Error(`Failed to get usage summary for subplan user: ${JSON.stringify(getSubplanUsageSummary.body)}`);
+    }
+    console.log(`Usage summary for account ${createAccount.body.accountId} and subplan user ${subplanUserId}:`);
+    console.log(`Account - Monthly Limit: ${getSubplanUsageSummary.body.account.monthlyLimit}, Used: ${getSubplanUsageSummary.body.account.used}, Remaining: ${getSubplanUsageSummary.body.account.remaining}`);
+    console.log(`User - Monthly Limit: ${getSubplanUsageSummary.body.user.monthlyLimit}, Used: ${getSubplanUsageSummary.body.user.used}, Remaining: ${getSubplanUsageSummary.body.user.remaining}`);
 }
 
 main().catch(err => {
