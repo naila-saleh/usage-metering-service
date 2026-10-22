@@ -90,7 +90,7 @@ export async function consumeUsage(accountId: string, userId: string, requestId:
     return isUsageExists;
 }
 
-export async function getUsageSummary(accountId: string, userId: string) {
+export async function getUsageSummary(accountId: string, userId: string, month?: number, year?: number) {
     const account = await getAccountAndSubplanByAccountId(accountId);
     if (!account) {
         throw new Error(`Account with ID ${accountId} not found`);
@@ -99,21 +99,41 @@ export async function getUsageSummary(accountId: string, userId: string) {
     if (!user) {
         throw new Error(`User with ID ${userId} not found`);
     }
-    const now = new Date();
-    const accountCycle = getCurrentSubscriptionCycle(account.accounts.subscription_started_at, now);
-    const userCycle = getCurrentSubscriptionCycle(user.users.subscription_started_at, now);
-    const monthlyAccountUsage = await getMonthlyAccountUsage(accountId, accountCycle.start, accountCycle.end);
-    const monthlyUserUsage = await getMonthlyUserUsage(userId, accountId, userCycle.start, userCycle.end);
+    let accountCycle;
+    let userCycle;
+    let monthlyAccountUsage;
+    let monthlyUserUsage;
+    if (month === undefined || year === undefined) {
+        const now = new Date();
+        accountCycle = getCurrentSubscriptionCycle(account.accounts.subscription_started_at, now);
+        userCycle = getCurrentSubscriptionCycle(user.users.subscription_started_at, now);
+        monthlyAccountUsage = await getMonthlyAccountUsage(accountId, accountCycle.start, accountCycle.end);
+        monthlyUserUsage = await getMonthlyUserUsage(userId, accountId, userCycle.start, userCycle.end);
+        return {
+            account: {
+                monthlyLimit: account.subplans.monthly_limit,
+                used: monthlyAccountUsage,
+                remaining: Math.max(account.subplans.monthly_limit - monthlyAccountUsage, 0),
+            },
+            user: {
+                monthlyLimit: user.subplans.monthly_limit,
+                used: monthlyUserUsage,
+                remaining: Math.max(user.subplans.monthly_limit - monthlyUserUsage, 0),
+            },
+        };
+    }
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
+    monthlyAccountUsage = await getMonthlyAccountUsage(accountId, start, end);
+    monthlyUserUsage = await getMonthlyUserUsage(userId, accountId, start, end);
     return {
         account: {
             monthlyLimit: account.subplans.monthly_limit,
             used: monthlyAccountUsage,
-            remaining: Math.max(account.subplans.monthly_limit - monthlyAccountUsage, 0),
         },
         user: {
             monthlyLimit: user.subplans.monthly_limit,
             used: monthlyUserUsage,
-            remaining: Math.max(user.subplans.monthly_limit - monthlyUserUsage, 0),
         },
     };
 }

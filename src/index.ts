@@ -177,6 +177,7 @@ app.get("/usage/history", middlewareAuthenticateApiKey, async (req, res) => {
 app.get("/usage/summary", middlewareAuthenticateApiKey, async (req, res) => {
     const account = res.locals.account;
     const userId = req.query.userId;
+    const monthAndYear = req.query.monthAndYear;
     if (userId !== undefined) {
         if (typeof userId !== 'string' || userId.trim() === '' || !ensureIdIsUUID(userId)) {
             return res.status(400).json({ error: "Invalid userId" });
@@ -187,6 +188,24 @@ app.get("/usage/summary", middlewareAuthenticateApiKey, async (req, res) => {
         }
         if (user.users.account_id !== account.id) {
             return res.status(403).json({ error: "User does not belong to this account" });
+        }
+        if (monthAndYear !== undefined){
+            if (typeof monthAndYear !== 'string' || monthAndYear.trim() === '' || !/^\d{4}-\d{2}$/.test(monthAndYear)) {
+                return res.status(400).json({ error: "Invalid month format. Expected YYYY-MM" });
+            }
+            const [year, month] = monthAndYear.toString().split("-").map(Number);
+            if (month === undefined || year === undefined) {
+                return res.status(400).json({ error: "Invalid month and year format. Must be in the format YYYY-MM" });
+            }
+            if (month < 1 || month > 12) {
+                return res.status(400).json({ error: "Invalid month value. Must be between 01 and 12" });
+            }
+            // Check if the requested month and year is in the future (with UTC time zone)
+            if ((year*12+month) > (new Date().getUTCFullYear()*12+new Date().getUTCMonth()+1)) {
+                return res.status(400).json({ error: "Month cannot be in the future" });
+            }
+            const summary = await getUsageSummary(account.id, userId as string, month, year);
+            return res.status(200).json(summary);
         }
         const summary = await getUsageSummary(account.id, userId as string);
         return res.status(200).json(summary);
@@ -338,7 +357,7 @@ app.get("/users/:userId/plan", middlewareAuthenticateApiKey, async (req, res) =>
 
 app.post("/plans/:planId/subplans", middlewareAuthenticateApiKey, async (req, res) => {
     const planId = req.params.planId;
-    if (!planId || typeof planId !== 'string' || planId.trim() === '' || !ensureIdIsUUID(planId)) {
+    if (planId === undefined || typeof planId !== 'string' || planId.trim() === '' || !ensureIdIsUUID(planId)) {
         return res.status(400).json({ error: "Missing required field: planId" });
     }
     const { name, description, price, monthly_limit, max_request_limit } = req.body;
