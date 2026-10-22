@@ -86,6 +86,25 @@ The means below use all six supplied measurements for Scenario 1 and all seven s
 | 2: 100 concurrent requests for one account and user | 658.24 | 406.61 | 152.22 | 627.52 |
 | 3: 100 concurrent requests across five accounts | 284.48 | 187.38 | 351.60 | 271.47 |
 
+## Before and After Indexing
+
+Runs 1–3 were recorded before adding the database index, and runs 4–7 were recorded after adding it. The comparison below uses only the recorded RPS values for Scenarios 2 and 3; the periods are kept separate.
+
+| Scenario | Before indexing (runs 1–3 average RPS) | After indexing (runs 4–7 average RPS) |
+|---|---:|---:|
+| 2: 100 concurrent requests for one account and user | 148.64 | 154.91 |
+| 3: 100 concurrent requests across five accounts | 349.65 | 353.07 |
+
+The differences are small and may fall within normal measurement variability. These results do not demonstrate a significant performance improvement from indexing.
+
+## What I Learned
+
+In these measurements, the five-account scenario achieved approximately 352 RPS, compared with approximately 152 RPS for the single-account scenario, making it about 2.3 times faster. A major factor may be row-level locking with `FOR UPDATE`: concurrent transactions targeting the same account row must serialize, while requests targeting different account rows may execute concurrently.
+
+The index had no noticeable impact at the current data size based on this comparison. Indexing may become more important as the table grows, but these measurements do not establish that it improves performance here.
+
+The load generator and server run within the same process and environment, and no documented test environment is available to support generalizing these results to production.
+
 ## Conclusions and scope
 
 The measurements show the observed timing and throughput for six runs of Scenario 1 and seven runs each of Scenarios 2 and 3. The tests verified the scenario-specific status and usage assertions described above, and all supplied executions passed all three tests.

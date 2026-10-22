@@ -131,11 +131,19 @@ app.post("/usage/consume", middlewareAuthenticateApiKey, async (req, res) => {
     } catch (error) {
         const usage = await getUsageByRequestId(requestId, account.id);
         if (usage) {
+            if (usage.amount !== units) {
+                return res.status(409).json({ error: `Request with ID ${requestId} has already been processed with a different amount: ${usage.amount}` });
+            }
+            if (usage.user_id !== userId) {
+                return res.status(409).json({ error: `Request with ID ${requestId} has already been processed for a different user: ${usage.user_id}` });
+            }
+            if (usage.account_id !== account.id) {
+                return res.status(409).json({ error: `Request with ID ${requestId} has already been processed for a different account: ${usage.account_id}` });
+            }
             if (usage.is_success) {
                 return res.status(200).json({ success: true, unitsConsumed: usage.amount });
-            } else {
-                return res.status(403).json({ success: false, rejectedBy: usage.rejected_by, error: usage.rejected_reason });
             }
+            return res.status(403).json({ success: false, rejectedBy: usage.rejected_by, error: usage.rejected_reason });
         }
         console.error(error);
         return res.status(500).json({ error: "Internal server error" });
