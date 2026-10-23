@@ -170,6 +170,41 @@ describe("Usage Metering Service", () => {
         expect(usageResponse2.status).toBe(409); // Expecting conflict due to different amount with same requestId
     });
 
+    it('should return 409 when retrying a request with the same request ID but from different users.', async () => {
+        if (testUser1 === undefined || testUser2 === undefined) {
+            throw new Error("Test users are not defined");
+        }
+        const requestId = randomUUID();
+        const usageAmount = 2;
+        const usageResponse1 = await fetch(`${baseUrl}/usage/consume`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey1,
+            },
+            body: JSON.stringify({
+                userId: testUser1.id,
+                units: usageAmount,
+                requestId: requestId,
+            }),
+        });
+        expect(usageResponse1.status).toBe(200);
+
+        const usageResponse2 = await fetch(`${baseUrl}/usage/consume`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey1,
+            },
+            body: JSON.stringify({
+                userId: testUser2.id, // Different user
+                units: usageAmount, // Same amount
+                requestId: requestId, // Same requestId
+            }),
+        });
+        expect(usageResponse2.status).toBe(409); // Expecting conflict due to same requestId but different user
+    });
+
     it('should return the right usage consume summary for the current month.', async () => {
         if (testUser1 === undefined) {
             throw new Error("Test user is not defined");

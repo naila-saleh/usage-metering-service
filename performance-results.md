@@ -38,7 +38,8 @@ Before the concurrent batch, the test consumes 99 units using nine sequential re
 | 3 | 89.92 | 65.48 | 111.21 | 88.52 |
 | 4 | 88.54 | 61.96 | 112.95 | 87.39 |
 | 5 | 89.44 | 65.19 | 111.81 | 88.63 |
-| 6 | 104.87 | 77.67 | 95.36 | 103.18 |
+| 6 | 89.74 | 64.46 | 111.43 | 88.35 |
+| 7 | 104.87 | 77.67 | 95.36 | 103.18 |
 
 ## Scenario 2: 100 concurrent successful requests for one account and user
 
@@ -78,17 +79,17 @@ The supplied results contain seven runs for this scenario; all seven are include
 
 ## Summary of means
 
-The means below use all six supplied measurements for Scenario 1 and all seven supplied measurements for Scenarios 2 and 3.
+The means below use all seven supplied measurements for each scenario.
 
 | Scenario | Mean total duration (ms) | Mean average response time (ms) | Mean RPS | Mean P95 (ms) |
 |---|---:|---:|---:|---:|
-| 1: 10 concurrent requests near the rate limit | 91.32 | 66.03 | 109.95 | 90.06 |
+| 1: 10 concurrent requests near the rate limit | 91.10 | 65.81 | 110.17 | 89.82 |
 | 2: 100 concurrent requests for one account and user | 658.24 | 406.61 | 152.22 | 627.52 |
 | 3: 100 concurrent requests across five accounts | 284.48 | 187.38 | 351.60 | 271.47 |
 
 ## Before and After Indexing
 
-Runs 1–3 were recorded before adding the database index, and runs 4–7 were recorded after adding it. The comparison below uses only the recorded RPS values for Scenarios 2 and 3; the periods are kept separate.
+Runs 1–3 were recorded before adding the database index, and runs 4–7 were recorded after adding it. This split is based on the order of the executions relative to the index migration (`0006`). The comparison below uses only the recorded RPS values for Scenarios 2 and 3; the periods are kept separate.
 
 | Scenario | Before indexing (runs 1–3 average RPS) | After indexing (runs 4–7 average RPS) |
 |---|---:|---:|
@@ -107,6 +108,6 @@ The load generator and server run within the same process and environment, and n
 
 ## Conclusions and scope
 
-The measurements show the observed timing and throughput for six runs of Scenario 1 and seven runs each of Scenarios 2 and 3. The tests verified the scenario-specific status and usage assertions described above, and all supplied executions passed all three tests.
+The measurements show the observed timing and throughput for seven runs of each scenario. The tests verified the scenario-specific status and usage assertions described above, and all supplied executions passed all three tests.
 
 These results represent batches of 10 or 100 concurrent requests under the unrecorded test environment. They do not establish production capacity, maximum system capacity, sustained-load performance, behavior under larger loads, or guaranteed quota correctness for every possible concurrency pattern or workload. The commands `npm run generate` and `npm run migrate:test` run between some supplied executions were not treated as performance runs because their output contained no performance measurements.
